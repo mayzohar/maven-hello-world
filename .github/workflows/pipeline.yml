@@ -25,24 +25,25 @@ jobs:
 
       # Increase patch part of the jar version automatically (from 1.0.0 to 1.0.1)
       - name: Increase jar version (patch)
-        run: |
-          mvn versions:set -DnewVersion=1.0.1 versions:commit
+        working-directory: myapp
+        run: mvn versions:set -DnewVersion=1.0.1 versions:commit
 
       # Compile + Package
       - name: Build with Maven
+        working-directory: myapp
         run: mvn -B clean package
 
       - name: Create an artifact item for the build
         uses: actions/upload-artifact@v4
         with:
           name: jar-1.0.1
-          path: target/myapp-*.jar
+          path: myapp/target/myapp-*.jar
           if-no-files-found: error
 
       # Create a docker image containing the artifact
       - name: Build Docker image (tag = jar version)
         run: |
-          docker build -t "${{ secrets.DOCKERHUB_USERNAME }}/myapp:1.0.1" .
+          docker build -t "${{ secrets.DOCKERHUB_USERNAME }}/myapp:1.0.1" ./myapp
 
       # Login to Docker Hub
       - name: Login to Docker Hub
@@ -71,7 +72,7 @@ jobs:
       # Deploy with Helm
       - name: Helm deploy (dry-run)
         run: |
-          helm upgrade --install myapp ./maven-app \
-          --set image.repository=${{ secrets.DOCKERHUB_USERNAME }}/myapp \
-          --set image.tag=1.0.1 \
-          --dry-run
+          helm upgrade --install myapp ./myapp/maven-app \
+            --set image.repository=${{ secrets.DOCKERHUB_USERNAME }}/myapp \
+            --set image.tag=1.0.1 \
+            --dry-run
