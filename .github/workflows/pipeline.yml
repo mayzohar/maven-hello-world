@@ -72,7 +72,7 @@ jobs:
       # Deploy with Helm
       - name: Helm deploy (dry-run)
         run: |
-          helm upgrade --install myapp ./myapp/maven-app \
+          echo "helm upgrade --install myapp ./myapp/maven-app \
             --set image.repository=${{ secrets.DOCKERHUB_USERNAME }}/myapp \
             --set image.tag=1.0.1 \
-            --dry-run
+            --dry-run"
