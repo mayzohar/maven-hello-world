@@ -26,24 +26,31 @@ jobs:
       # Increase patch part of the jar version automatically (from 1.0.0 to 1.0.1)
       - name: Increase jar version (patch)
         working-directory: myapp
-        run: mvn versions:set -DnewVersion=1.0.1 versions:commit
+        run: mvn build-helper:parse-version versions:set -DnewVersion=${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion+1} versions:commit
+
+      - name: Read project version
+        id: ver
+        working-directory: myapp
+        run: |
+          VERSION="$(mvn -B help:evaluate -Dexpression=project.version -q -DforceStdout)"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       # Compile + Package
       - name: Build with Maven
         working-directory: myapp
         run: mvn -B clean package
 
-      - name: Create an artifact item for the build
+      - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
-          name: jar-1.0.1
-          path: myapp/target/myapp-*.jar
+          name: jar-${{ steps.ver.outputs.version }}
+          path: myapp/target/*.jar
           if-no-files-found: error
 
       # Create a docker image containing the artifact
       - name: Build Docker image (tag = jar version)
         run: |
-          docker build -t "${{ secrets.DOCKERHUB_USERNAME }}/myapp:1.0.1" ./myapp
+          docker build -t "${{ secrets.DOCKERHUB_USERNAME }}/myapp:${{ steps.ver.outputs.version }}" ./myapp
 
       # Login to Docker Hub
       - name: Login to Docker Hub
@@ -55,13 +62,13 @@ jobs:
       # Push image to Docker Hub
       - name: Push Docker image
         run: |
-          docker push "${{ secrets.DOCKERHUB_USERNAME }}/myapp:1.0.1"
+          docker push "${{ secrets.DOCKERHUB_USERNAME }}/myapp:${{ steps.ver.outputs.version }}"
 
       # Download and run the docker image
       - name: Pull and run image
         run: |
-          docker pull "${{ secrets.DOCKERHUB_USERNAME }}/myapp:1.0.1"
-          docker run --rm "${{ secrets.DOCKERHUB_USERNAME }}/myapp:1.0.1"
+          docker pull "${{ secrets.DOCKERHUB_USERNAME }}/myapp:${{ steps.ver.outputs.version }}"
+          docker run --rm "${{ secrets.DOCKERHUB_USERNAME }}/myapp:${{ steps.ver.outputs.version }}"
 
       # Makes sure Helm is installed before deploying
       - name: Install Helm
@@ -74,5 +81,5 @@ jobs:
         run: |
           echo "helm upgrade --install myapp ./myapp/maven-app \
             --set image.repository=${{ secrets.DOCKERHUB_USERNAME }}/myapp \
-            --set image.tag=1.0.1 \
+            --set image.tag=${{ steps.ver.outputs.version }} \
             --dry-run"
